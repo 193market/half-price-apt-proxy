@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: half-price-apt-proxy
+    runtime: python
+    buildCommand: ""
+    startCommand: python proxy_server.py
+    plan: free
+    envVars:
+      - key: PYTHONIOENCODING
+        value: utf-8
