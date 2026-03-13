@@ -8,6 +8,7 @@ import urllib.parse
 import json
 import re
 import os
+from datetime import datetime, timedelta
 
 SERVICE_KEY = "xsG0WMPtWS1mUarzKPkfhWjUUvyKIqfBF34M5NHtM7PcQykB9r9bfji96dhrfkH0peDerZ6iDfVqwSoYS9SEcQ=="
 PORT = int(os.environ.get("PORT", 8090))
@@ -15,8 +16,8 @@ PORT = int(os.environ.get("PORT", 8090))
 APIS = {
     # LH 임대주택단지 조회
     "lh_complexes": "http://apis.data.go.kr/B552555/lhLeaseInfo1/lhLeaseInfo1",
-    # LH 분양임대공고문 조회
-    "lh_announcements": "http://apis.data.go.kr/B552555/lhLeaseNoticeList1/lhLeaseNoticeList1",
+    # LH 분양임대공고문 조회 (올바른 엔드포인트)
+    "lh_announcements": "http://apis.data.go.kr/B552555/lhLeaseNoticeInfo1/lhLeaseNoticeInfo1",
     # LH 공고 상세
     "lh_announcement_detail": "http://apis.data.go.kr/B552555/lhLeaseNoticeDetail1/lhLeaseNoticeDetail1",
     # 마이홈포털 공공주택 모집공고
@@ -83,9 +84,15 @@ class Handler(BaseHTTPRequestHandler):
 
         # ── LH 분양임대공고 목록
         elif path == "/api/lh/announcements":
+            today = datetime.now()
+            past = (today - timedelta(days=90)).strftime("%Y.%m.%d")
+            future = (today + timedelta(days=90)).strftime("%Y.%m.%d")
             params = {
                 "PG_SZ": qs.get("size", "20"),
                 "PAGE":  qs.get("page", "1"),
+                "PAN_NT_ST_DT": past,
+                "CLSG_DT": future,
+                "PAN_SS": "공고중",
             }
             data = fetch_api(APIS["lh_announcements"], params)
             self.send_json(self._parse_lh_announcements(data))
@@ -163,7 +170,6 @@ class Handler(BaseHTTPRequestHandler):
 
     def _parse_lh_announcements(self, data):
         try:
-            # API returns a list: [{dsSch:[...]}, {dsList:[...items...], resHeader:{...}}]
             items = []
             if isinstance(data, list):
                 for part in data:
@@ -171,15 +177,20 @@ class Handler(BaseHTTPRequestHandler):
                         items = part["dsList"]
                         break
             elif isinstance(data, dict):
-                items = data.get("dsList", [{}])[0].get("row", [])
+                for key in ["dsList", "items"]:
+                    if key in data:
+                        items = data[key]
+                        break
             return {
                 "items": [{
-                    "id":       r.get("PAN_ID", ""),
-                    "title":    r.get("PAN_NM", ""),
-                    "type":     r.get("HSB_TP_CD_NM", ""),
-                    "startDate": r.get("RCPT_BGN_DE", ""),
-                    "endDate":  r.get("RCPT_END_DE", ""),
-                    "region":   r.get("CNP_CD_NM", ""),
+                    "id":        r.get("PAN_ID", ""),
+                    "title":     r.get("PAN_NM", ""),
+                    "type":      r.get("AIS_TP_CD_NM", r.get("UPP_AIS_TP_NM", "")),
+                    "startDate": r.get("PAN_NT_ST_DT", ""),
+                    "endDate":   r.get("CLSG_DT", ""),
+                    "region":    r.get("CNP_CD_NM", ""),
+                    "status":    r.get("PAN_SS", ""),
+                    "url":       r.get("DTL_URL", ""),
                 } for r in items],
                 "total": len(items)
             }
