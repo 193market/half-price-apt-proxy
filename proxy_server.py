@@ -152,8 +152,8 @@ class Handler(BaseHTTPRequestHandler):
                     "type":     r.get("AIS_TP_CD_NM", ""),
                     "units":    r.get("SUM_HSH_CNT", 0),
                     "area":     r.get("DDO_AR", 0),
-                    "deposit":  int(r.get("LS_GMY", 0) or 0),
-                    "rent":     int(r.get("RFE", 0) or 0),
+                    "deposit":  int(r.get("LS_GMY", 0) or 0) // 10000,  # 원→만원
+                    "rent":     int(r.get("RFE", 0) or 0) // 10000,      # 원→만원
                     "moveIn":   r.get("MVIN_XPC_YM", ""),
                 } for r in items],
                 "total": len(items)
